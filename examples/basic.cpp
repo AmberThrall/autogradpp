@@ -7,10 +7,10 @@ using namespace autogradpp;
 int main() {
     std::cout << "autogradpp version: " << autogradpp::version() << std::endl;
 
-    auto x = input(Tensord::ones({5}));
-    auto y = constant(Tensord::zeros({3}));
-    auto w = var(Tensord::randn({5, 3}));
-    auto b = var(Tensord::randn({3}));
+    auto x = input(Tensor::ones({5}));
+    auto y = constant(Tensor::zeros({3}));
+    auto w = var(Tensor::randn({5, 3}));
+    auto b = var(Tensor::randn({3}));
 
     auto z = add(matmul(x, w), b);
 

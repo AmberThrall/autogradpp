@@ -9,10 +9,9 @@
 namespace autogradpp {
     using Index = std::vector<size_t>;
 
-    template <typename T>
     class Tensor {
     public:
-        using iterator = typename std::vector<T>::iterator;
+        using iterator = typename std::vector<double>::iterator;
 
         Tensor() : _shape({}), _data(compute_size(_shape)) {
             compute_strides();
@@ -23,18 +22,18 @@ namespace autogradpp {
         }
 
         /// Returns a scalar tensor
-        static Tensor<T> scalar(T val) { 
-            Tensor<T> t;
+        static Tensor scalar(double val) { 
+            Tensor t;
             t.data()[0] = val;
             return t;
         }
 
         /// Returns a tensor filled with zeros
-        static Tensor<T> zeros(Index shape) { return Tensor<T>(shape); }
+        static Tensor zeros(Index shape) { return Tensor(shape); }
 
         /// Returns a tensor filled with ones 
-        static Tensor<T> ones(Index shape) {
-            Tensor<T> t(shape);
+        static Tensor ones(Index shape) {
+            Tensor t(shape);
             for (size_t k = 0; k < t.size(); ++k) {
                 t.data()[k] = 1;
             }
@@ -42,8 +41,8 @@ namespace autogradpp {
         }
 
         /// Creates a 2-D tensor with ones on the diagonal and zeros elsewhere
-        static Tensor<T> eye(size_t n) {
-            Tensor<T> t({n, n});
+        static Tensor eye(size_t n) {
+            Tensor t({n, n});
             for (size_t k = 0; k < n; ++k) {
                 t(k,k) = 1;
             }
@@ -51,12 +50,12 @@ namespace autogradpp {
         }
 
         /// Returns a tensor filled with uniform random values on [low,high) 
-        static Tensor<T> rand(int low, int high, Index shape) {
+        static Tensor rand(int low, int high, Index shape) {
             std::random_device rd;
             std::mt19937 gen(rd());
-            std::uniform_real_distribution<T> distrib(low, high);
+            std::uniform_real_distribution<double> distrib(low, high);
 
-            Tensor<T> t(shape);
+            Tensor t(shape);
             for (size_t k = 0; k < t.size(); ++k) {
                 t.data()[k] = distrib(gen);
             }
@@ -64,12 +63,12 @@ namespace autogradpp {
         }
 
         /// Returns a tensor filled with uniform random integers on [low, high]
-        static Tensor<T> randint(int low, int high, Index shape) {
+        static Tensor randint(int low, int high, Index shape) {
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_int_distribution<int> distrib(low, high);
 
-            Tensor<T> t(shape);
+            Tensor t(shape);
             for (size_t k = 0; k < t.size(); ++k) {
                 t.data()[k] = distrib(gen);
             }
@@ -77,12 +76,12 @@ namespace autogradpp {
         }
 
         /// Returns a tensor filled with random values from the standard normal distribution
-        static Tensor<T> randn(Index shape) {
+        static Tensor randn(Index shape) {
             std::random_device rd;
             std::mt19937 gen(rd());
-            std::normal_distribution<T> distrib(0, 1);
+            std::normal_distribution<double> distrib(0, 1);
 
-            Tensor<T> t(shape);
+            Tensor t(shape);
             for (size_t k = 0; k < t.size(); ++k) {
                 t.data()[k] = distrib(gen);
             }
@@ -90,24 +89,24 @@ namespace autogradpp {
         }
 
         template<typename... Idx>
-        T& operator()(Idx... idx) {
+        double& operator()(Idx... idx) {
             return _data[offset({static_cast<size_t>(idx)...})];
         }
 
         template<typename... Idx>
-        const T& operator()(Idx... idx) const {
+        const double& operator()(Idx... idx) const {
             return _data[offset({static_cast<size_t>(idx)...})];
         }
 
-        T& operator()(Index idx) {
+        double& operator()(Index idx) {
             return _data[offset(idx)];
         }
 
-        const T& operator()(Index idx) const {
+        const double& operator()(Index idx) const {
             return _data[offset(idx)];
         }
 
-        void map(std::function<T(T)> fn) {
+        void map(std::function<double(double)> fn) {
             for (size_t k = 0; k < _data.size(); ++k) {
                 _data[k] = fn(_data[k]); 
             }
@@ -118,36 +117,33 @@ namespace autogradpp {
         size_t size() const { return _data.size(); }
         const Index& strides() const { return _strides; }
 
-        Tensor<T> reshape(Index new_shape) const {
+        Tensor reshape(Index new_shape) const {
             size_t new_size = compute_size(new_shape); 
             if (new_size != _data.size()) { 
                 throw std::invalid_argument("reshape: total size mismatch.");
             }
 
-            Tensor<T> res;
+            Tensor res;
             res._shape = std::move(new_shape);
             res._data = _data;
             res.compute_strides();
             return res;
         }
 
-        T* data() { return _data.data(); }
-        const T* data() const { return _data.data(); }
+        double* data() { return _data.data(); }
+        const double* data() const { return _data.data(); }
 
         iterator begin() { return _data.begin(); }
         iterator end() { return _data.end(); }
 
         // Operator overloads
-        template <typename U>
-        bool operator==(const Tensor<U>& rhs) const {
+        bool operator==(const Tensor& rhs) const {
             if (shape() != rhs.shape()) { return false; }
-            return _data == rhs.data();
+            return _data == rhs._data;
         }
-        template <typename U>
-        bool operator!=(const Tensor<U>& rhs) const { return !(*this == rhs); }
+        bool operator!=(const Tensor& rhs) const { return !(*this == rhs); }
        
-        template <typename U>
-        Tensor<T>& operator+=(const Tensor<U>& rhs) {
+        Tensor& operator+=(const Tensor& rhs) {
             if (shape() != rhs.shape()) {
                 throw std::invalid_argument("cannot add tensors of different shape."); 
             }
@@ -157,8 +153,7 @@ namespace autogradpp {
             return *this;
         }
 
-        template <typename U>
-        Tensor<T>& operator-=(const Tensor<U>& rhs) {
+        Tensor& operator-=(const Tensor& rhs) {
             if (shape() != rhs.shape()) {
                 throw std::invalid_argument("cannot subtract tensors of different shape."); 
             }
@@ -168,8 +163,7 @@ namespace autogradpp {
             return *this;
         }
 
-        template <typename U>
-        Tensor<T>& operator*=(const Tensor<U>& rhs) {
+        Tensor& operator*=(const Tensor& rhs) {
             if (shape() != rhs.shape()) {
                 throw std::invalid_argument("cannot multiply tensors of different shape."); 
             }
@@ -179,8 +173,7 @@ namespace autogradpp {
             return *this;
         }
 
-        template <typename U>
-        Tensor<T>& operator/=(const Tensor<U>& rhs) {
+        Tensor& operator/=(const Tensor& rhs) {
             if (shape() != rhs.shape()) {
                 throw std::invalid_argument("cannot divide tensors of different shape."); 
             }
@@ -190,16 +183,14 @@ namespace autogradpp {
             return *this;
         }
 
-        template <typename U>
-        Tensor<T>& operator*=(const U& rhs) {
+        Tensor& operator*=(double rhs) {
             for (size_t k = 0; k < size(); ++k) {
                 _data[k] *= rhs;
             }
             return *this;
         }
 
-        template <typename U>
-        Tensor<T>& operator/=(const U& rhs) {
+        Tensor& operator/=(double rhs) {
             for (size_t k = 0; k < size(); ++k) {
                 _data[k] /= rhs;
             }
@@ -208,7 +199,7 @@ namespace autogradpp {
     private:
         Index _shape;
         Index _strides;
-        std::vector<T> _data;
+        std::vector<double> _data;
 
         static size_t compute_size(Index& shape) {
             size_t s = 1;
@@ -233,8 +224,7 @@ namespace autogradpp {
         }
     };
 
-    template <typename T>
-    std::ostream& operator<<(std::ostream& os, const Tensor<T>& t) {
+    std::ostream& operator<<(std::ostream& os, const Tensor& t) {
         const Index& shape = t.shape();
         size_t rank = shape.size();
         size_t total = t.size();
@@ -268,29 +258,15 @@ namespace autogradpp {
         return os;
     }
 
-    template <typename T, typename U>
-    Tensor<T> operator+(Tensor<T> lhs, const Tensor<U>& rhs) { lhs += rhs; return lhs; }
+    inline Tensor operator+(Tensor lhs, const Tensor& rhs) { lhs += rhs; return lhs; }
+    inline Tensor operator-(Tensor lhs, const Tensor& rhs) { lhs -= rhs; return lhs; }
+    inline Tensor operator*(Tensor lhs, const Tensor& rhs) { lhs *= rhs; return lhs; }
+    inline Tensor operator/(Tensor lhs, const Tensor& rhs) { lhs /= rhs; return lhs; }
+    inline Tensor operator*(Tensor lhs, double rhs) { lhs *= rhs; return lhs; }
+    inline Tensor operator*(double rhs, Tensor lhs) { lhs *= rhs; return lhs; }
+    inline Tensor operator/(Tensor lhs, double rhs) { lhs /= rhs; return lhs; }
 
-    template <typename T, typename U>
-    Tensor<T> operator-(Tensor<T> lhs, const Tensor<U>& rhs) { lhs -= rhs; return lhs; }
-
-    template <typename T, typename U>
-    Tensor<T> operator*(Tensor<T> lhs, const Tensor<U>& rhs) { lhs *= rhs; return lhs; }
-
-    template <typename T, typename U>
-    Tensor<T> operator/(Tensor<T> lhs, const Tensor<U>& rhs) { lhs /= rhs; return lhs; }
-
-    template <typename T, typename U>
-    Tensor<T> operator*(Tensor<T> lhs, const U& rhs) { lhs *= rhs; return lhs; }
-
-    template <typename T, typename U>
-    Tensor<T> operator*(const U& rhs, Tensor<T> lhs) { lhs *= rhs; return lhs; }
-
-    template <typename T, typename U>
-    Tensor<T> operator/(Tensor<T> lhs, const U& rhs) { lhs /= rhs; return lhs; }
-
-    template <typename T, typename U>
-    Tensor<T> matmul2d(const Tensor<T>& lhs, const Tensor<U>& rhs) {
+    inline Tensor matmul2d(const Tensor& lhs, const Tensor& rhs) {
         const Index& ashape = lhs.shape();
         const Index& bshape = rhs.shape();
         if (ashape.size() != 2 || bshape.size() != 2) {
@@ -301,10 +277,10 @@ namespace autogradpp {
             throw std::invalid_argument("matmul2d: inner dimensions don't match.");
         }
 
-        Tensor<T> out({ashape[0], bshape[1]});
+        Tensor out({ashape[0], bshape[1]});
         for (size_t i = 0; i < ashape[0]; ++i) {
             for (size_t j = 0; j < bshape[1]; ++j) {
-                T sum = T{};
+                double sum = 0.0;
                 for (size_t k = 0; k < ashape[1]; ++k) {
                     sum += lhs(i, k) * rhs(k, j);
                 }
@@ -316,8 +292,7 @@ namespace autogradpp {
         return out;
     }
    
-    template <typename T, typename U>
-    Tensor<T> matmul(Tensor<T> lhs, Tensor<U> rhs) {
+    inline Tensor matmul(Tensor lhs, Tensor rhs) {
         Index ashape = lhs.shape();
         Index bshape = rhs.shape();
         if (ashape.size() > 2 || bshape.size() > 2) {
@@ -327,7 +302,7 @@ namespace autogradpp {
         if (ashape.size() == 1) { lhs = lhs.reshape({1, ashape[0]}); }
         if (bshape.size() == 1) { rhs = rhs.reshape({bshape[0], 1}); }
 
-        Tensor<T> res = matmul2d(lhs, rhs);
+        Tensor res = matmul2d(lhs, rhs);
         if (ashape.size() == 1 && bshape.size() == 1) { return res.reshape({}); }
         else if (ashape.size() == 1) { 
             Index s = res.shape();
@@ -342,7 +317,4 @@ namespace autogradpp {
 
         return res;
     }
-
-    using Tensorf = Tensor<float>;
-    using Tensord = Tensor<double>;
 }

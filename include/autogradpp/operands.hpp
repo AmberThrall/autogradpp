@@ -7,33 +7,33 @@
 namespace autogradpp {
     class InputOp : public Operand {
     public:
-        InputOp(Tensord val) : _val(val) {}
+        InputOp(Tensor val) : _val(val) {}
 
-        Tensord forward(std::vector<Tensord>& inputs) {
+        Tensor forward(std::vector<Tensor>& inputs) {
             return _val;
         }
     private:
-        Tensord _val;
+        Tensor _val;
     };
 
-    inline std::shared_ptr<Node> input(Tensord val) {
+    inline std::shared_ptr<Node> input(Tensor val) {
         auto op = std::make_unique<InputOp>(val);
         return std::make_shared<Node>(Node(std::move(op), {}, false));
     }
 
-    inline std::shared_ptr<Node> var(Tensord val) {
+    inline std::shared_ptr<Node> var(Tensor val) {
         auto op = std::make_unique<InputOp>(val);
         return std::make_shared<Node>(Node(std::move(op), {}));
     }
 
-    inline std::shared_ptr<Node> constant(Tensord val) {
+    inline std::shared_ptr<Node> constant(Tensor val) {
         auto op = std::make_unique<InputOp>(val);
         return std::make_shared<Node>(Node(std::move(op), {}));
     }
 
     class MulOp : public Operand {
     public:
-        Tensord forward(std::vector<Tensord>& inputs) {
+        Tensor forward(std::vector<Tensor>& inputs) {
             return inputs[0] * inputs[1];
         }
     };
@@ -45,7 +45,7 @@ namespace autogradpp {
 
     class AddOp : public Operand {
     public:
-        Tensord forward(std::vector<Tensord>& inputs) {
+        Tensor forward(std::vector<Tensor>& inputs) {
             return inputs[0] + inputs[1];
         }
     };
@@ -58,7 +58,7 @@ namespace autogradpp {
 
     class MatMulOp : public Operand {
     public:
-        Tensord forward(std::vector<Tensord>& inputs) {
+        Tensor forward(std::vector<Tensor>& inputs) {
             return matmul(inputs[0], inputs[1]);
         }
     };
