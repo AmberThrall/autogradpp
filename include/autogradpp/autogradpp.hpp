@@ -3,6 +3,8 @@
 #include <string>
 
 #include "tensor.hpp"
+#include "node.hpp"
+#include "operands.hpp"
 
 namespace autogradpp {
     /// Returns the library version as a string.
