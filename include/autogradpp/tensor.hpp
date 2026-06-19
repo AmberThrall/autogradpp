@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <random>
+#include <stdexcept>
+#include <functional>
 #include <vector>
 
 namespace autogradpp {
@@ -12,8 +14,19 @@ namespace autogradpp {
     public:
         using iterator = typename std::vector<T>::iterator;
 
+        Tensor() : _shape({}), _data(compute_size(_shape)) {
+            compute_strides();
+        }
+
         Tensor(Index shape) : _shape(std::move(shape)), _data(compute_size(_shape)) {
             compute_strides();
+        }
+
+        /// Returns a scalar tensor
+        static Tensor<T> scalar(T val) { 
+            Tensor<T> t;
+            t.data()[0] = val;
+            return t;
         }
 
         /// Returns a tensor filled with zeros
@@ -94,15 +107,104 @@ namespace autogradpp {
             return _data[offset(idx)];
         }
 
+        void map(std::function<T(T)> fn) {
+            for (size_t k = 0; k < _data.size(); ++k) {
+                _data[k] = fn(_data[k]); 
+            }
+        }
+
         const size_t rank() const { return _shape.size() - 1; }
         const Index& shape() const { return _shape; }
         size_t size() const { return _data.size(); }
+        const Index& strides() const { return _strides; }
+
+        Tensor<T> reshape(Index new_shape) const {
+            size_t new_size = compute_size(new_shape); 
+            if (new_size != _data.size()) { 
+                throw std::invalid_argument("reshape: total size mismatch.");
+            }
+
+            Tensor<T> res;
+            res._shape = std::move(new_shape);
+            res._data = _data;
+            res.compute_strides();
+            return res;
+        }
 
         T* data() { return _data.data(); }
         const T* data() const { return _data.data(); }
 
         iterator begin() { return _data.begin(); }
         iterator end() { return _data.end(); }
+
+        // Operator overloads
+        template <typename U>
+        bool operator==(const Tensor<U>& rhs) const {
+            if (shape() != rhs.shape()) { return false; }
+            return _data == rhs.data();
+        }
+        template <typename U>
+        bool operator!=(const Tensor<U>& rhs) const { return !(*this == rhs); }
+       
+        template <typename U>
+        Tensor<T>& operator+=(const Tensor<U>& rhs) {
+            if (shape() != rhs.shape()) {
+                throw std::invalid_argument("cannot add tensors of different shape."); 
+            }
+            for (size_t k = 0; k < size(); ++k) {
+                _data[k] += rhs.data()[k];
+            }
+            return *this;
+        }
+
+        template <typename U>
+        Tensor<T>& operator-=(const Tensor<U>& rhs) {
+            if (shape() != rhs.shape()) {
+                throw std::invalid_argument("cannot subtract tensors of different shape."); 
+            }
+            for (size_t k = 0; k < size(); ++k) {
+                _data[k] -= rhs.data()[k];
+            }
+            return *this;
+        }
+
+        template <typename U>
+        Tensor<T>& operator*=(const Tensor<U>& rhs) {
+            if (shape() != rhs.shape()) {
+                throw std::invalid_argument("cannot multiply tensors of different shape."); 
+            }
+            for (size_t k = 0; k < size(); ++k) {
+                _data[k] *= rhs.data()[k];
+            }
+            return *this;
+        }
+
+        template <typename U>
+        Tensor<T>& operator/=(const Tensor<U>& rhs) {
+            if (shape() != rhs.shape()) {
+                throw std::invalid_argument("cannot divide tensors of different shape."); 
+            }
+            for (size_t k = 0; k < size(); ++k) {
+                _data[k] /= rhs.data()[k];
+            }
+            return *this;
+        }
+
+        template <typename U>
+        Tensor<T>& operator*=(const U& rhs) {
+            for (size_t k = 0; k < size(); ++k) {
+                _data[k] *= rhs;
+            }
+            return *this;
+        }
+
+        template <typename U>
+        Tensor<T>& operator/=(const U& rhs) {
+            for (size_t k = 0; k < size(); ++k) {
+                _data[k] /= rhs;
+            }
+            return *this;
+        }
     private:
         Index _shape;
         Index _strides;
@@ -164,6 +266,81 @@ namespace autogradpp {
         for (size_t i = 0; i < rank; ++i) { os << "]"; }
 
         return os;
+    }
+
+    template <typename T, typename U>
+    Tensor<T> operator+(Tensor<T> lhs, const Tensor<U>& rhs) { lhs += rhs; return lhs; }
+
+    template <typename T, typename U>
+    Tensor<T> operator-(Tensor<T> lhs, const Tensor<U>& rhs) { lhs -= rhs; return lhs; }
+
+    template <typename T, typename U>
+    Tensor<T> operator*(Tensor<T> lhs, const Tensor<U>& rhs) { lhs *= rhs; return lhs; }
+
+    template <typename T, typename U>
+    Tensor<T> operator/(Tensor<T> lhs, const Tensor<U>& rhs) { lhs /= rhs; return lhs; }
+
+    template <typename T, typename U>
+    Tensor<T> operator*(Tensor<T> lhs, const U& rhs) { lhs *= rhs; return lhs; }
+
+    template <typename T, typename U>
+    Tensor<T> operator*(const U& rhs, Tensor<T> lhs) { lhs *= rhs; return lhs; }
+
+    template <typename T, typename U>
+    Tensor<T> operator/(Tensor<T> lhs, const U& rhs) { lhs /= rhs; return lhs; }
+
+    template <typename T, typename U>
+    Tensor<T> matmul2d(const Tensor<T>& lhs, const Tensor<U>& rhs) {
+        const Index& ashape = lhs.shape();
+        const Index& bshape = rhs.shape();
+        if (ashape.size() != 2 || bshape.size() != 2) {
+            throw std::invalid_argument("matmul2d: tensors must be 2-D.");
+        }
+
+        if (ashape[1] != bshape[0]) {
+            throw std::invalid_argument("matmul2d: inner dimensions don't match.");
+        }
+
+        Tensor<T> out({ashape[0], bshape[1]});
+        for (size_t i = 0; i < ashape[0]; ++i) {
+            for (size_t j = 0; j < bshape[1]; ++j) {
+                T sum = T{};
+                for (size_t k = 0; k < ashape[1]; ++k) {
+                    sum += lhs(i, k) * rhs(k, j);
+                }
+
+                out(i, j) = sum;
+            }
+        }
+
+        return out;
+    }
+   
+    template <typename T, typename U>
+    Tensor<T> matmul(Tensor<T> lhs, Tensor<U> rhs) {
+        Index ashape = lhs.shape();
+        Index bshape = rhs.shape();
+        if (ashape.size() > 2 || bshape.size() > 2) {
+            throw std::invalid_argument("matmul: higher dimensional matrix multiplication is currently not supported.");
+        }
+
+        if (ashape.size() == 1) { lhs = lhs.reshape({1, ashape[0]}); }
+        if (bshape.size() == 1) { rhs = rhs.reshape({bshape[0], 1}); }
+
+        Tensor<T> res = matmul2d(lhs, rhs);
+        if (ashape.size() == 1 && bshape.size() == 1) { return res.reshape({}); }
+        else if (ashape.size() == 1) { 
+            Index s = res.shape();
+            s.erase(s.end() - 2); 
+            return res.reshape(s);
+        }
+        else if (bshape.size() == 1) { 
+            Index s = res.shape();
+            s.erase(s.end() - 1); 
+            return res.reshape(s);
+        }
+
+        return res;
     }
 
     using Tensorf = Tensor<float>;
