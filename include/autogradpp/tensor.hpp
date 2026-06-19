@@ -164,21 +164,31 @@ namespace autogradpp {
         }
 
         Tensor& operator*=(const Tensor& rhs) {
-            if (shape() != rhs.shape()) {
+            if (shape() != rhs.shape() && rhs.shape().size() != 1) {
                 throw std::invalid_argument("cannot multiply tensors of different shape."); 
             }
             for (size_t k = 0; k < size(); ++k) {
-                _data[k] *= rhs.data()[k];
+                if (rhs.shape().size() == 1) {
+                    _data[k] *= rhs.data()[0];
+                }
+                else {
+                    _data[k] *= rhs.data()[k];
+                }
             }
             return *this;
         }
 
         Tensor& operator/=(const Tensor& rhs) {
-            if (shape() != rhs.shape()) {
+            if (shape() != rhs.shape() && rhs.shape().size() != 1) {
                 throw std::invalid_argument("cannot divide tensors of different shape."); 
             }
             for (size_t k = 0; k < size(); ++k) {
-                _data[k] /= rhs.data()[k];
+                if (rhs.shape().size() == 1) {
+                    _data[k] /= rhs.data()[0];
+                }
+                else {
+                    _data[k] /= rhs.data()[k];
+                }
             }
             return *this;
         }
@@ -224,7 +234,7 @@ namespace autogradpp {
         }
     };
 
-    std::ostream& operator<<(std::ostream& os, const Tensor& t) {
+    inline std::ostream& operator<<(std::ostream& os, const Tensor& t) {
         const Index& shape = t.shape();
         size_t rank = shape.size();
         size_t total = t.size();
