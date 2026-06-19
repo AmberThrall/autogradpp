@@ -1,0 +1,87 @@
+# Build directories
+build/
+build*/
+cmake-build-*/
+out/
+.cache/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+Makefile
+
+# CPack
+CPackConfig.cmake
+CPackSourceConfig.cmake
+_CPack_Packages/
+
+# Ninja
+.ninja_deps
+.ninja_log
+build.ninja
+
+# Visual Studio
+.vs/
+*.vcxproj*
+*.sln
+*.vcproj*
+*.user
+*.suo
+
+# CLion
+.idea/
+
+# VS Code (optional)
+.vscode/
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+
+# macOS
+.DS_Store
+
+# Linux
+*~
+*.swp
+*.swo
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Compiled objects
+*.o
+*.obj
+*.lo
+*.la
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+
+# Debugging / profiling
+*.gcda
+*.gcno
+*.gcov
+gmon.out
+
+# Sanitizers
+*.profraw
+*.profdata
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
