@@ -151,7 +151,7 @@ namespace autogradpp {
 
         std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) {
             auto val = forward(inputs);
-            return {grad * val * (1.0 - val)};    
+            return {grad * val * (Tensor::ones(val.shape()) - val)};    
         }
     };
 

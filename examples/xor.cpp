@@ -1,5 +1,4 @@
 #include <autogradpp/autogradpp.hpp>
-#include <memory>
 
 using namespace autogradpp;
 
@@ -38,7 +37,7 @@ int main() {
     std::cout << "Number of Epochs: " << num_epochs << std::endl;
     std::cout << std::endl;
 
-    NeuralNetwork<Tanh> network({2, 4, 1});
+    NeuralNetwork<Sigmoid> network({2, 4, 1});
 
     for (size_t epoch = 0; epoch < num_epochs; ++epoch) {
         double total_loss = 0.0;
