@@ -1,3 +1,4 @@
+#include "autogradpp/mlp.hpp"
 #include <autogradpp/autogradpp.hpp>
 #include <memory>
 
@@ -38,7 +39,7 @@ int main() {
     std::cout << "Number of Epochs: " << num_epochs << std::endl;
     std::cout << std::endl;
 
-    NeuronLayer<Sigmoid> neuron(2, 1);
+    NeuralNetwork<Sigmoid> neuron({2, 1});
 
     for (size_t epoch = 0; epoch < num_epochs; ++epoch) {
         double total_loss = 0.0;
@@ -46,18 +47,15 @@ int main() {
             auto y_pred = neuron.forward(x_val);
             auto y_true = constant(y_val);
             auto loss = mse(y_pred, y_true);
-            //std::cout << "y_pred = " << y_pred->value << "; y_true = " << y_true->value << std::endl;
 
             total_loss += loss->value;
             loss->backward();
 
             // Gradient descent
-            neuron.weight->value -= learning_rate * neuron.weight->grad;
-            neuron.bias->value -= learning_rate * neuron.bias->grad;
-
-            // Zero out grad for next iteration
-            neuron.weight->grad = Tensor::zeros(neuron.weight->grad.shape());
-            neuron.bias->grad = Tensor::zeros(neuron.bias->grad.shape());
+            for (auto param : neuron.parameters()) {
+                param->value -= learning_rate * param->grad;
+                param->grad = Tensor::zeros(param->grad.shape());
+            }
         }
 
         if ((epoch+1) % 1000 == 0 || epoch == 0) {

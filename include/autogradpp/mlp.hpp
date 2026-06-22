@@ -16,10 +16,6 @@ namespace autogradpp {
         NeuronLayer(size_t num_inputs, size_t num_outputs) 
             : weight(var(Tensor::rand(-1.0, 1.0, {num_outputs, num_inputs}))), 
               bias(var(Tensor::zeros({num_outputs}))) {
-            if (num_outputs == 1) {
-                weight = var(Tensor::rand(-1.0, 1.0, {num_inputs}));
-                bias = var(Tensor::scalar(0.0));
-            }
         }
 
         std::shared_ptr<Node> forward(const Tensor& x) {
