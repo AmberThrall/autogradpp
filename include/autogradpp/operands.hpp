@@ -39,7 +39,7 @@ namespace autogradpp {
     }
     inline std::shared_ptr<Node> constant(double val) { return constant(Tensor::scalar(val)); }
 
-    class MulOp : public Operand {
+    class Mul : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
             return inputs[0] * inputs[1];
@@ -51,11 +51,11 @@ namespace autogradpp {
     };
 
     inline std::shared_ptr<Node> mul(std::shared_ptr<Node> a, std::shared_ptr<Node> b) {
-        auto op = std::make_unique<MulOp>();
+        auto op = std::make_unique<Mul>();
         return std::make_shared<Node>(Node(std::move(op), {a, b}));
     }
 
-    class DivOp : public Operand {
+    class Div : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
             return inputs[0] / inputs[1];
@@ -67,11 +67,11 @@ namespace autogradpp {
     };
 
     inline std::shared_ptr<Node> div(std::shared_ptr<Node> a, std::shared_ptr<Node> b) {
-        auto op = std::make_unique<DivOp>();
+        auto op = std::make_unique<Div>();
         return std::make_shared<Node>(Node(std::move(op), {a, b}));
     }
 
-    class AddOp : public Operand {
+    class Add : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
             return inputs[0] + inputs[1];
@@ -83,11 +83,11 @@ namespace autogradpp {
     };
 
     inline std::shared_ptr<Node> add(std::shared_ptr<Node> a, std::shared_ptr<Node> b) {
-        auto op = std::make_unique<AddOp>();
+        auto op = std::make_unique<Add>();
         return std::make_shared<Node>(Node(std::move(op), {a, b}));
     }
 
-    class SubOp : public Operand {
+    class Sub : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
             return inputs[0] - inputs[1];
@@ -100,27 +100,46 @@ namespace autogradpp {
     };
 
     inline std::shared_ptr<Node> sub(std::shared_ptr<Node> a, std::shared_ptr<Node> b) {
-        auto op = std::make_unique<SubOp>();
+        auto op = std::make_unique<Sub>();
         return std::make_shared<Node>(Node(std::move(op), {a, b}));
     }
 
-    class MatMulOp : public Operand {
+    class MatMul : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
             return matmul(inputs[0], inputs[1]);
         }
 
         std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) {
-            return {matmul(grad, inputs[1].transpose()), matmul(inputs[0].transpose(), grad)};    
+            if (inputs[0].shape().size() == 0 && inputs[1].shape().size() == 0) {
+                return {grad * inputs[1], grad * inputs[0]};
+            }
+
+            Tensor grad_a, grad_b; 
+            auto gshape = grad.shape();
+            auto bshape = inputs[1].shape();
+
+            if (gshape.size() == 1 && bshape.size() == 1) { // Compute the outer product for grad_a
+                Tensor g = grad.reshape({gshape[0], 1}); // {n} -> {n,1}
+                Tensor x = inputs[1].reshape({1, bshape[0]}); // {m} -> {1,m}
+                grad_a = matmul2d(g, x);
+                grad_b = matmul(inputs[0].transpose(), grad);
+            }
+            else {
+                grad_a = matmul(grad, inputs[1].transpose());
+                grad_b = matmul(inputs[0].transpose(), grad);
+            }
+
+            return {grad_a, grad_b};    
         }
     };
 
     inline std::shared_ptr<Node> matmul(std::shared_ptr<Node> a, std::shared_ptr<Node> b) {
-        auto op = std::make_unique<MatMulOp>();
+        auto op = std::make_unique<MatMul>();
         return std::make_shared<Node>(Node(std::move(op), {a, b}));
     }
 
-    class SigmoidOp : public Operand {
+    class Sigmoid : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
             Tensor copy = inputs[0];
@@ -137,11 +156,11 @@ namespace autogradpp {
     };
 
     inline std::shared_ptr<Node> sigmoid(std::shared_ptr<Node> a) {
-        auto op = std::make_unique<SigmoidOp>();
+        auto op = std::make_unique<Sigmoid>();
         return std::make_shared<Node>(Node(std::move(op), {a}));
     }
 
-    class ReLUOp : public Operand {
+    class ReLU : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
             Tensor copy = inputs[0];
@@ -161,11 +180,11 @@ namespace autogradpp {
     };
 
     inline std::shared_ptr<Node> relu(std::shared_ptr<Node> a) {
-        auto op = std::make_unique<ReLUOp>();
+        auto op = std::make_unique<ReLU>();
         return std::make_shared<Node>(Node(std::move(op), {a}));
     }
 
-    class TanhOp : public Operand {
+    class Tanh : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
             Tensor copy = inputs[0];
@@ -183,11 +202,11 @@ namespace autogradpp {
     };
 
     inline std::shared_ptr<Node> tanh(std::shared_ptr<Node> a) {
-        auto op = std::make_unique<TanhOp>();
+        auto op = std::make_unique<Tanh>();
         return std::make_shared<Node>(Node(std::move(op), {a}));
     }
 
-    class HardTanhOp : public Operand {
+    class HardTanh : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
             Tensor copy = inputs[0];
@@ -207,7 +226,7 @@ namespace autogradpp {
     };
 
     inline std::shared_ptr<Node> hard_tanh(std::shared_ptr<Node> a) {
-        auto op = std::make_unique<HardTanhOp>();
+        auto op = std::make_unique<HardTanh>();
         return std::make_shared<Node>(Node(std::move(op), {a}));
     }
 }

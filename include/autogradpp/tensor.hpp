@@ -118,13 +118,13 @@ namespace autogradpp {
         const Index& strides() const { return _strides; }
 
         Tensor transpose() const {
-            Tensor copy(*this);
-            if (_shape.size() < 2) { return copy; }
+            if (_shape.size() < 2) { return Tensor(*this); }
             if (_shape.size() > 2) {
                 throw std::runtime_error("transpose: higher-dimensional transpose not supported.");
             }
 
-            for (size_t r = 0; r < _shape[0]; ++r) {
+            Tensor copy({_shape[1], _shape[0]});
+            for (size_t r = 0; r < _shape[1]; ++r) {
                 for (size_t c = 0; c < _shape[0]; ++c) {
                     copy(r, c) = (*this)(c, r);
                 }
@@ -312,6 +312,7 @@ namespace autogradpp {
         }
 
         if (ashape[1] != bshape[0]) {
+            std::cout << "A: " << ashape[0] << "x" << ashape[1] << "; B: " << bshape[0] << "x" << bshape[1] << std::endl;
             throw std::invalid_argument("matmul2d: inner dimensions don't match.");
         }
 
@@ -336,6 +337,10 @@ namespace autogradpp {
         if (ashape.size() > 2 || bshape.size() > 2) {
             throw std::invalid_argument("matmul: higher dimensional matrix multiplication is currently not supported.");
         }
+        /*if (ashape.size() == 1) { std::cout << "A: " << ashape[0] << std::endl; } 
+        else if (ashape.size() == 2) { std::cout << "A: " << ashape[0] << "x" << ashape[1] << std::endl; }
+        if (bshape.size() == 1) { std::cout << "B: " << bshape[0] << std::endl; } 
+        else if (bshape.size() == 2) { std::cout << "B: " << bshape[0] << "x" << bshape[1] << std::endl; }*/
 
         if (ashape.size() == 0) { return rhs * lhs; }
         if (bshape.size() == 0) { return lhs * rhs; }

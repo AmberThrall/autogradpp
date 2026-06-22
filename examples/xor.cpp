@@ -28,36 +28,33 @@ int main() {
 
     std::vector<std::pair<Tensor, double>> dataset = {
         build_datum(0, 0, 0),
-        build_datum(0, 1, 0),
-        build_datum(1, 0, 0),
-        build_datum(1, 1, 1),
+        build_datum(0, 1, 1),
+        build_datum(1, 0, 1),
+        build_datum(1, 1, 0),
     };
 
-    std::cout << "Desired Function: AND" << std::endl;
+    std::cout << "Desired Function: XOR" << std::endl;
     std::cout << "Learning Rate: " << learning_rate << std::endl;
     std::cout << "Number of Epochs: " << num_epochs << std::endl;
     std::cout << std::endl;
 
-    NeuronLayer<Sigmoid> neuron(2, 1);
+    NeuralNetwork<Tanh> network({2, 4, 1});
 
     for (size_t epoch = 0; epoch < num_epochs; ++epoch) {
         double total_loss = 0.0;
         for (auto& [x_val, y_val] : dataset) {
-            auto y_pred = neuron.forward(x_val);
+            auto y_pred = network.forward(x_val);
             auto y_true = constant(y_val);
             auto loss = mse(y_pred, y_true);
-            //std::cout << "y_pred = " << y_pred->value << "; y_true = " << y_true->value << std::endl;
 
-            total_loss += loss->value;
             loss->backward();
+            total_loss += loss->value;
 
             // Gradient descent
-            neuron.weight->value -= learning_rate * neuron.weight->grad;
-            neuron.bias->value -= learning_rate * neuron.bias->grad;
-
-            // Zero out grad for next iteration
-            neuron.weight->grad = Tensor::zeros(neuron.weight->grad.shape());
-            neuron.bias->grad = Tensor::zeros(neuron.bias->grad.shape());
+            for (auto param : network.parameters()) {
+                param->value -= learning_rate * param->grad;
+                param->grad = Tensor::zeros(param->grad.shape());
+            }
         }
 
         if ((epoch+1) % 1000 == 0 || epoch == 0) {
@@ -69,7 +66,7 @@ int main() {
     std::cout << std::endl << "After Training:" << std::endl;
     double mse = 0;
     for (auto& [x_val, y_val] : dataset) {
-        auto y_pred = neuron.forward(x_val);
+        auto y_pred = network.forward(x_val);
         auto y_true = constant(y_val);
 
         std::cout << "  x=" << x_val  << " -> pred=" << y_pred->value << " (target=" << y_true->value << ")" << std::endl;
