@@ -112,10 +112,26 @@ namespace autogradpp {
             }
         }
 
-        const size_t rank() const { return _shape.size() - 1; }
+        const size_t rank() const { return _shape.size(); }
         const Index& shape() const { return _shape; }
         size_t size() const { return _data.size(); }
         const Index& strides() const { return _strides; }
+
+        Tensor transpose() const {
+            Tensor copy(*this);
+            if (_shape.size() < 2) { return copy; }
+            if (_shape.size() > 2) {
+                throw std::runtime_error("transpose: higher-dimensional transpose not supported.");
+            }
+
+            for (size_t r = 0; r < _shape[0]; ++r) {
+                for (size_t c = 0; c < _shape[0]; ++c) {
+                    copy(r, c) = (*this)(c, r);
+                }
+            }
+
+            return copy;
+        }
 
         Tensor reshape(Index new_shape) const {
             size_t new_size = compute_size(new_shape); 
@@ -142,6 +158,13 @@ namespace autogradpp {
             return _data == rhs._data;
         }
         bool operator!=(const Tensor& rhs) const { return !(*this == rhs); }
+
+        operator double() const {
+            if (rank() != 0) { 
+                throw std::invalid_argument("can only convert 0-tensor to double.");
+            }
+            return _data[0];
+        }
        
         Tensor& operator+=(const Tensor& rhs) {
             if (shape() != rhs.shape()) {
@@ -164,11 +187,11 @@ namespace autogradpp {
         }
 
         Tensor& operator*=(const Tensor& rhs) {
-            if (shape() != rhs.shape() && rhs.shape().size() != 1) {
+            if (shape() != rhs.shape() && rhs.shape().size() != 0) {
                 throw std::invalid_argument("cannot multiply tensors of different shape."); 
             }
             for (size_t k = 0; k < size(); ++k) {
-                if (rhs.shape().size() == 1) {
+                if (rhs.shape().size() == 0) {
                     _data[k] *= rhs.data()[0];
                 }
                 else {
@@ -270,7 +293,12 @@ namespace autogradpp {
 
     inline Tensor operator+(Tensor lhs, const Tensor& rhs) { lhs += rhs; return lhs; }
     inline Tensor operator-(Tensor lhs, const Tensor& rhs) { lhs -= rhs; return lhs; }
-    inline Tensor operator*(Tensor lhs, const Tensor& rhs) { lhs *= rhs; return lhs; }
+    inline Tensor operator*(Tensor lhs, Tensor rhs) { 
+        if (lhs.rank() == 0) {
+            rhs *= lhs; return rhs; 
+        }
+        lhs *= rhs; return lhs; 
+    }
     inline Tensor operator/(Tensor lhs, const Tensor& rhs) { lhs /= rhs; return lhs; }
     inline Tensor operator*(Tensor lhs, double rhs) { lhs *= rhs; return lhs; }
     inline Tensor operator*(double rhs, Tensor lhs) { lhs *= rhs; return lhs; }
@@ -309,6 +337,8 @@ namespace autogradpp {
             throw std::invalid_argument("matmul: higher dimensional matrix multiplication is currently not supported.");
         }
 
+        if (ashape.size() == 0) { return rhs * lhs; }
+        if (bshape.size() == 0) { return lhs * rhs; }
         if (ashape.size() == 1) { lhs = lhs.reshape({1, ashape[0]}); }
         if (bshape.size() == 1) { rhs = rhs.reshape({bshape[0], 1}); }
 

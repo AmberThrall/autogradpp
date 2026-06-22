@@ -7,14 +7,44 @@ using namespace autogradpp;
 int main() {
     std::cout << "autogradpp version: " << autogradpp::version() << std::endl;
 
-    auto x = input(Tensor::ones({5}));
-    auto y = constant(Tensor::zeros({3}));
-    auto w = var(Tensor::randn({5, 3}));
-    auto b = var(Tensor::randn({3}));
+    double learning_rate = 0.1;
+    double stopping_criteria = 1e-8;
+    Tensor x_start = Tensor::ones({2});
+    Tensor soln = Tensor::zeros({2});
+    soln(0) = 2; soln(1) = 5;
 
-    auto z = add(matmul(x, w), b);
+    std::cout << "Input Function: z = (x-2)^2 + (y-5)^2" << std::endl;
+    std::cout << "Starting Position: " << x_start << std::endl;
+    std::cout << "Learning Rate: " << learning_rate << std::endl;
+    std::cout << "Stopping Criteria: |Δz| < " << stopping_criteria << std::endl;
+    std::cout << std::endl;
 
-    std::cout << z->value << std::endl;
+    double last_z = 0.0;
+    int step = 0;
+
+    while (true) {
+        // Compute z = (x-2)^2 + (y-5)^2
+        auto x = input(x_start);
+        auto c = constant(soln);
+
+        auto diff = sub(x, c);
+        auto z = matmul(mul(diff, diff), constant(Tensor::ones({2})));
+
+        if (std::abs(last_z - z->value) < stopping_criteria && step > 0) { break; }
+
+        // Differentiate and perform gradient descent
+        z->backward();
+
+        if ((step+1) % 5 == 0 || step == 0) {
+            printf("%3d: x=%.3f, y=%.3f, z=%.4f, ∂z/∂x=%.3f, ∂z/∂y=%.3f\n", step+1, x->value(0), x->value(1), (double)z->value, x->grad(0), x->grad(1));
+        }
+
+        x_start -= learning_rate * x->grad;
+        last_z = z->value;
+        step += 1;
+    }
+
+    printf("\nMinimum: x=%.3f, y=%.3f, z=%.4f\n", x_start(0), x_start(1), last_z);
 
     return 0;
 }
