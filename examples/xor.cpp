@@ -40,24 +40,24 @@ int main() {
     NeuralNetwork network({2, 4, 1}, {activations::tanh, activations::tanh});
 
     for (size_t epoch = 0; epoch < num_epochs; ++epoch) {
-        double total_loss = 0.0;
+        auto total_loss = input(0.0);
         for (auto& [x_val, y_val] : dataset) {
             auto y_pred = network.forward(x_val);
             auto y_true = constant(y_val);
             auto loss = mse(y_pred, y_true);
 
-            loss->backward();
-            total_loss += loss->value;
-
-            // Gradient descent
-            for (auto param : network.parameters()) {
-                param->value -= learning_rate * param->grad;
-                param->grad = Tensor::zeros(param->grad.shape());
-            }
+            total_loss = add(total_loss, loss);
+        }
+            
+        // Gradient descent
+        total_loss->backward();
+        for (auto param : network.parameters()) {
+            param->value -= learning_rate * param->grad;
+            param->grad = Tensor::zeros(param->grad.shape());
         }
 
         if ((epoch+1) % 1000 == 0 || epoch == 0) {
-            std::cout << "  epoch " << std::setw(5) << epoch + 1 << " loss=" << total_loss / 4 << std::endl;
+            std::cout << "  epoch " << std::setw(5) << epoch + 1 << " loss=" << total_loss->value << std::endl;
         }
     }
 
