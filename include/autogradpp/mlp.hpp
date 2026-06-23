@@ -46,24 +46,28 @@ namespace autogradpp {
 
     class NeuralNetwork {
     public:
-        NeuralNetwork(std::vector<size_t> layer_sizes, std::vector<ActivationFn> activation_fns = {}) {
-            if (layer_sizes.size() < 2) {
+        NeuralNetwork(size_t input_size, std::vector<size_t> layers) {
+            if (layers.size() < 1) {
                 throw std::runtime_error("Neural network requires at least two layers.");
             }
 
-            if (layer_sizes.size() != activation_fns.size() + 1 && !activation_fns.empty()) {
-                throw std::runtime_error("Wrong number of activation functions provided. There should be one per non-input layer.");
+            size_t in_dim = input_size;
+            for (size_t i = 0; i < layers.size(); ++i) {
+                size_t out_dim = layers[i]; 
+                _layers.push_back(std::make_unique<NeuronLayer>(in_dim, out_dim, activations::relu));
+                in_dim = out_dim;
+            }
+        }
+
+        NeuralNetwork(size_t input_size, std::vector<std::pair<size_t, ActivationFn>> layers) {
+            if (layers.size() < 1) {
+                throw std::runtime_error("Neural network requires at least two layers.");
             }
 
-            size_t in_dim = layer_sizes[0];
-            for (size_t i = 1; i < layer_sizes.size(); ++i) {
-                size_t out_dim = layer_sizes[i]; 
-                if (activation_fns.empty()) {
-                    _layers.push_back(std::make_unique<NeuronLayer>(in_dim, out_dim));
-                }
-                else {
-                    _layers.push_back(std::make_unique<NeuronLayer>(in_dim, out_dim, activation_fns[i-1]));
-                }
+            size_t in_dim = input_size;
+            for (size_t i = 0; i < layers.size(); ++i) {
+                size_t out_dim = layers[i].first; 
+                _layers.push_back(std::make_unique<NeuronLayer>(in_dim, out_dim, layers[i].second));
                 in_dim = out_dim;
             }
         }

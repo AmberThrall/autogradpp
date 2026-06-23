@@ -39,7 +39,7 @@ int main() {
     std::cout << "Number of Epochs: " << num_epochs << std::endl;
     std::cout << std::endl;
 
-    NeuralNetwork neuron({2, 1}, {activations::sigmoid});
+    NeuralNetwork neuron(2, {{1, activations::sigmoid}});
 
     for (size_t epoch = 0; epoch < num_epochs; ++epoch) {
         double total_loss = 0.0;
