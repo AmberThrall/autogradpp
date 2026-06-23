@@ -31,6 +31,15 @@ namespace autogradpp {
         /// Returns a tensor filled with zeros
         static Tensor zeros(Index shape) { return Tensor(shape); }
 
+        /// Returns a 1-tensor given by arguments
+        static Tensor vector(std::vector<double> entries) {
+            Tensor t({entries.size()});
+            for (size_t i = 0; i < entries.size(); ++i) {
+                t(i) = entries[i];
+            }
+            return t;
+        }
+
         /// Returns a tensor filled with ones 
         static Tensor ones(Index shape) {
             Tensor t(shape);

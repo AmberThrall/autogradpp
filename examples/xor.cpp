@@ -5,12 +5,6 @@ using namespace autogradpp;
 #include <iomanip>
 #include <iostream>
 
-std::pair<Tensor, double> build_datum(double a, double b, double y) {
-    Tensor t({2});
-    t(0) = a; t(1) = b;
-    return {t, y};
-}
-
 int main() {
     std::cout << "autogradpp version: " << autogradpp::version() << std::endl;
 
@@ -18,10 +12,10 @@ int main() {
     size_t num_epochs = 10000;
 
     std::vector<std::pair<Tensor, double>> dataset = {
-        build_datum(0, 0, 0),
-        build_datum(0, 1, 1),
-        build_datum(1, 0, 1),
-        build_datum(1, 1, 0),
+        {Tensor::vector({0, 0}), 0},
+        {Tensor::vector({0, 1}), 1},
+        {Tensor::vector({1, 0}), 1},
+        {Tensor::vector({1, 1}), 0},
     };
 
     std::cout << "Desired Function: XOR" << std::endl;
@@ -29,12 +23,15 @@ int main() {
     std::cout << "Number of Epochs: " << num_epochs << std::endl;
     std::cout << std::endl;
 
+    // Create a multilayer perceptron with one hidden layer. Use tanh as the activation function.
     NeuralNetwork network(2, {
         {4, activations::tanh}, 
         {1, activations::tanh}
     });
 
+    // Perform batch gradient descent `num_epochs` times
     for (size_t epoch = 0; epoch < num_epochs; ++epoch) {
+        // Construct the graph
         auto total_loss = input(0.0);
         for (auto& [x_val, y_val] : dataset) {
             auto y_pred = network.forward(x_val);
@@ -52,7 +49,7 @@ int main() {
         }
 
         if ((epoch+1) % 1000 == 0 || epoch == 0) {
-            std::cout << "  epoch " << std::setw(5) << epoch + 1 << " loss=" << total_loss->value << std::endl;
+            std::cout << "  epoch " << std::setw(5) << epoch + 1 << " loss=" << total_loss->value / 4.0 << std::endl;
         }
     }
 
@@ -68,7 +65,7 @@ int main() {
         double err = y_pred->value - y_true->value;
         mse += err * err;
     }
-    std::cout << std::endl << "Mean-squared Error: " << mse << std::endl;
+    std::cout << std::endl << "Mean-squared Error: " << mse / 4 << std::endl;
 
 
     return 0;

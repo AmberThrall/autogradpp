@@ -7,12 +7,6 @@ using namespace autogradpp;
 #include <iomanip>
 #include <iostream>
 
-std::pair<Tensor, double> build_datum(double a, double b, double y) {
-    Tensor t({2});
-    t(0) = a; t(1) = b;
-    return {t, y};
-}
-
 std::shared_ptr<Node> mse(std::shared_ptr<Node> y_pred, std::shared_ptr<Node> y_true) {
     auto diff = sub(y_pred, y_true);
     auto diff_sq = mul(diff, diff);
@@ -28,10 +22,10 @@ int main() {
     size_t num_epochs = 10000;
 
     std::vector<std::pair<Tensor, double>> dataset = {
-        build_datum(0, 0, 0),
-        build_datum(0, 1, 0),
-        build_datum(1, 0, 0),
-        build_datum(1, 1, 1),
+        {Tensor::vector({0, 0}), 0},
+        {Tensor::vector({0, 1}), 0},
+        {Tensor::vector({1, 0}), 0},
+        {Tensor::vector({1, 1}), 1},
     };
 
     std::cout << "Desired Function: AND" << std::endl;
