@@ -15,6 +15,7 @@ namespace autogradpp {
         inline ActivationFn relu = autogradpp::relu;
         inline ActivationFn tanh = autogradpp::tanh;
         inline ActivationFn hard_tanh = autogradpp::hard_tanh;
+        inline ActivationFn softmax = autogradpp::softmax;
     }
 
     class NeuronLayer {

@@ -229,4 +229,32 @@ namespace autogradpp {
         auto op = std::make_unique<HardTanh>();
         return std::make_shared<Node>(Node(std::move(op), {a}));
     }
+
+    class Softmax : public Operand {
+    public:
+        Tensor forward(std::vector<Tensor>& inputs) {
+            if (inputs[0].rank() == 0) { return Tensor::scalar(1); }
+
+            double den = 0;
+            for (size_t i = 0; i < inputs[0].size(); ++i) {
+                den += std::exp(inputs[0].data()[i]);
+            }
+            Tensor copy = inputs[0];
+            copy.map([&](double v) {
+                return std::exp(v) / den;
+            });
+            return copy;
+        }
+
+        std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) {
+            auto a = forward(inputs);
+            Tensor dot = matmul(grad, a);
+            return {a * grad - dot * a};
+        }
+    };
+
+    inline std::shared_ptr<Node> softmax(std::shared_ptr<Node> a) {
+        auto op = std::make_unique<Softmax>();
+        return std::make_shared<Node>(Node(std::move(op), {a}));
+    }
 }
