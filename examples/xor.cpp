@@ -37,7 +37,7 @@ int main() {
     std::cout << "Number of Epochs: " << num_epochs << std::endl;
     std::cout << std::endl;
 
-    NeuralNetwork<Sigmoid> network({2, 4, 1});
+    NeuralNetwork network({2, 4, 1}, {activations::tanh, activations::tanh});
 
     for (size_t epoch = 0; epoch < num_epochs; ++epoch) {
         double total_loss = 0.0;
