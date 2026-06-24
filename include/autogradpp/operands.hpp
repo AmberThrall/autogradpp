@@ -35,7 +35,7 @@ namespace autogradpp {
 
     inline std::shared_ptr<Node> constant(Tensor val) {
         auto op = std::make_unique<InputOp>(val);
-        return std::make_shared<Node>(Node(std::move(op), {}));
+        return std::make_shared<Node>(Node(std::move(op), {}, false));
     }
     inline std::shared_ptr<Node> constant(double val) { return constant(Tensor::scalar(val)); }
 
@@ -211,7 +211,7 @@ namespace autogradpp {
         Tensor forward(std::vector<Tensor>& inputs) {
             Tensor copy = inputs[0];
             copy.map([](double v) {
-                return std::max(std::min(v, 1.0), 1.0);
+                return std::max(std::min(v, 1.0), -1.0);
             });
             return copy;
         }
@@ -235,26 +235,43 @@ namespace autogradpp {
         Tensor forward(std::vector<Tensor>& inputs) {
             if (inputs[0].rank() == 0) { return Tensor::scalar(1); }
 
+            double max_val = *std::max_element(inputs[0].data(), inputs[0].data() + inputs[0].size());
             double den = 0;
             for (size_t i = 0; i < inputs[0].size(); ++i) {
-                den += std::exp(inputs[0].data()[i]);
+                den += std::exp(inputs[0][i] - max_val);
             }
             Tensor copy = inputs[0];
-            copy.map([&](double v) {
-                return std::exp(v) / den;
-            });
+            copy.map([&](double v) { return std::exp(v - max_val) / den; });
             return copy;
         }
 
         std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) {
             auto a = forward(inputs);
-            Tensor dot = matmul(grad, a);
-            return {a * grad - dot * a};
+            double dot = 0.0;
+            for (size_t i = 0; i < a.size(); ++i) {
+                dot += grad[i] * a[i];
+            }
+            Tensor result = a;
+            for (size_t i = 0; i < result.size(); ++i) {
+                result[i] = a[i] * (grad[i] - dot);
+            }
+            return {result};
         }
     };
 
     inline std::shared_ptr<Node> softmax(std::shared_ptr<Node> a) {
         auto op = std::make_unique<Softmax>();
+        return std::make_shared<Node>(Node(std::move(op), {a}));
+    }
+
+    class Linear : public Operand {
+    public:
+        Tensor forward(std::vector<Tensor>& inputs) { return inputs[0]; }
+        std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) { return { grad }; }
+    };
+
+    inline std::shared_ptr<Node> linear(std::shared_ptr<Node> a) {
+        auto op = std::make_unique<Linear>();
         return std::make_shared<Node>(Node(std::move(op), {a}));
     }
 }

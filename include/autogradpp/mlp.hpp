@@ -8,14 +8,18 @@
 #include <stdexcept>
 
 namespace autogradpp {
-    using ActivationFn = std::function<std::shared_ptr<Node>(std::shared_ptr<Node>)>;
+    enum class Init { He, Xavier, Uniform };
+    struct ActivationFn {
+        std::function<std::shared_ptr<Node>(std::shared_ptr<Node>)> fn;
+        Init init;
+    };
 
     namespace activations {
-        inline ActivationFn sigmoid = autogradpp::sigmoid;
-        inline ActivationFn relu = autogradpp::relu;
-        inline ActivationFn tanh = autogradpp::tanh;
-        inline ActivationFn hard_tanh = autogradpp::hard_tanh;
-        inline ActivationFn softmax = autogradpp::softmax;
+        inline ActivationFn linear = { autogradpp::linear, Init::Xavier };
+        inline ActivationFn sigmoid = { autogradpp::sigmoid, Init::Xavier };
+        inline ActivationFn relu = { autogradpp::relu, Init::He };
+        inline ActivationFn tanh = { autogradpp::tanh, Init::Xavier };
+        inline ActivationFn hard_tanh = { autogradpp::hard_tanh, Init::Xavier };
     }
 
     class NeuronLayer {
@@ -24,10 +28,20 @@ namespace autogradpp {
         std::shared_ptr<Node> bias;
         ActivationFn activation_fn;
 
-        NeuronLayer(size_t num_inputs, size_t num_outputs, ActivationFn fn = relu)
-            : weight(var(Tensor::rand(-1.0, 1.0, {num_outputs, num_inputs}))), 
-              bias(var(Tensor::zeros({num_outputs}))),
+        NeuronLayer(size_t num_inputs, size_t num_outputs, ActivationFn fn = activations::relu)
+            : bias(var(Tensor::zeros({num_outputs}))),
               activation_fn(fn) {
+            switch (fn.init) {
+                case Init::He:
+                    weight = var(Tensor::randn({num_outputs, num_inputs}, 0.0, std::sqrt(2.0 / num_inputs)));
+                    break;
+                case Init::Xavier:
+                    weight = var(Tensor::randn({num_outputs, num_inputs}, 0.0, std::sqrt(1.0 / num_inputs)));
+                    break;
+                case Init::Uniform:
+                    weight = var(Tensor::rand({num_outputs, num_inputs}, -1.0, 1.0));
+                    break;
+            }
         }
 
         std::shared_ptr<Node> forward(const Tensor& x) {
@@ -35,13 +49,8 @@ namespace autogradpp {
         }
 
         std::shared_ptr<Node> forward(std::shared_ptr<Node> x) {
-            /*if (x->value.shape() != weight->value.shape()) {
-                throw std::runtime_error("forward: input is not the same shape as weight tensor.");
-            }*/
-
             auto pre_activation = add(matmul(weight, x), bias);
-            //std::cout << "pre_activation for W=" << weight->value << ": " << pre_activation->value << std::endl;
-            return activation_fn(pre_activation);
+            return activation_fn.fn(pre_activation);
         }
     };
 

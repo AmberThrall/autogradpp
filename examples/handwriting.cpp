@@ -1,6 +1,9 @@
 #include <autogradpp/autogradpp.hpp>
+#include "autogradpp/mlp.hpp"
 #include "indicators/indicators.hpp"
+#include <limits>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <algorithm>
 #include <vector>
@@ -10,6 +13,12 @@
 
 using namespace autogradpp;
 using namespace indicators;
+
+std::string format_number(double x, size_t width = 0) {
+    std::ostringstream oss;
+    oss << std::setw(width) << x;
+    return oss.str();
+}
 
 class MNISTDataset {
 public:
@@ -103,7 +112,7 @@ public:
     }
 
     std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) {
-        return { inputs[0] - inputs[1], Tensor::zeros(inputs[1].shape()) };
+        return { (inputs[0] - inputs[1]) * grad, Tensor::zeros(inputs[1].shape()) };
     }        
 };
 
@@ -120,8 +129,8 @@ int main() {
     MNISTDataset dataset("mnist/train-images-idx3-ubyte", "mnist/train-labels-idx1-ubyte");
     std::cout << "Done" << std::endl;
 
-    double learning_rate = 0.1;
-    size_t num_epochs = 15;
+    double learning_rate = 0.01;
+    size_t num_epochs = 20;
     size_t batch_size = 16;
     size_t num_batches = std::ceil((float)dataset.num_images() / (float)batch_size);
 
@@ -136,7 +145,7 @@ int main() {
     NeuralNetwork network(dataset.image_size(), {
         {128, activations::relu}, 
         {64, activations::relu}, 
-        {10, activations::softmax}
+        {10, activations::linear}
     });
 
     std::cout << "== Training ==" << std::endl;
@@ -156,7 +165,7 @@ int main() {
         option::FontStyles{std::vector<FontStyle>{FontStyle::bold}}
     };
     ProgressBar batch_bar{
-        option::BarWidth{50},
+        option::BarWidth{46},
         option::Start{"["},
         option::Fill{"="},
         option::Lead{">"},
@@ -165,12 +174,12 @@ int main() {
         option::MaxProgress{num_batches},
         option::ForegroundColor{Color::white},
         option::ShowPercentage{true},
-        option::ShowElapsedTime{true},
-        option::ShowRemainingTime{true},
+        option::ShowElapsedTime{false},
+        option::ShowRemainingTime{false},
         option::PrefixText{"Batch "},
-        option::FontStyles{std::vector<FontStyle>{FontStyle::bold}}
+        option::FontStyles{std::vector<FontStyle>{FontStyle::bold}},
     };
-    indicators::MultiProgress<ProgressBar, 2> bars(epoch_bar, batch_bar);
+    DynamicProgress<ProgressBar> bars(epoch_bar, batch_bar);
 
     // We want to shuffle the order of images each epoch
     std::vector<size_t> image_order;
@@ -180,44 +189,56 @@ int main() {
 
     // Perform mini-batch gradient descent `num_epochs` times
     for (size_t epoch = 0; epoch < num_epochs; ++epoch) {
-        epoch_bar.set_option(option::PostfixText { std::to_string(epoch) + "/" + std::to_string(num_epochs) });
+        epoch_bar.set_option(option::PrefixText { "Epoch " + format_number(epoch+1, 2) + "/" + std::to_string(num_epochs) + " " });
         batch_bar.set_progress(0);
 
         for (size_t batch = 0; batch < num_batches; ++batch) {
-            batch_bar.set_option(option::PostfixText { std::to_string(batch) + "/" + std::to_string(num_batches) });
+            batch_bar.set_option(option::PrefixText { "Batch " + format_number(batch+1, 4) + "/" + std::to_string(num_batches) + " " });
 
             // Construct the graph
+            double actual_batch_size = 0;
             auto total_loss = input(0.0);
-            for (size_t id = batch * batch_size; id < (batch + 1) * batch_size && id < dataset.num_images(); ++id) {
+            for (size_t i = 0; i < batch_size; ++i) {
+                actual_batch_size += 1;
+                size_t id = batch * batch_size + i;
+                if (id >= dataset.num_images()) { break; }
+
                 auto datum = dataset.sample(image_order[id]);
-                auto y_pred = network.forward(datum.first);
+                auto logits = network.forward(datum.first);
+                auto y_pred = softmax(logits);
 
                 Tensor label_onehot = Tensor::zeros({10});
-                label_onehot(datum.second) = 1;
+                label_onehot[datum.second] = 1;
                 auto y_true = constant(label_onehot);
 
                 auto loss = cross_entropy(y_pred, y_true);
-                total_loss = add(total_loss, mul(loss, loss));
+                total_loss = add(total_loss, loss);
             }
+            total_loss = div(total_loss, constant(Tensor::scalar(actual_batch_size)));
                 
             // Gradient descent
             total_loss->backward();
             for (auto param : network.parameters()) {
+                double norm = 0.0;
+                for (size_t i = 0; i < param->grad.size(); ++i) { 
+                    norm += param->grad[i] * param->grad[i];
+                }
+
                 param->value -= learning_rate * param->grad;
                 param->grad = Tensor::zeros(param->grad.shape());
             }
+            batch_bar.set_option(option::PostfixText { " loss=" + std::to_string(total_loss->value) + " " });
 
-            bars.tick<1>();
+            bars[1].tick();
         }
+        bars[1].mark_as_completed();
 
         std::shuffle(image_order.begin(), image_order.end(), rng);
-        bars.tick<0>();
+        bars[0].tick();
     }
 
     epoch_bar.set_option(option::PostfixText { std::to_string(num_epochs) + "/" + std::to_string(num_epochs) });
     epoch_bar.mark_as_completed();
-    batch_bar.set_option(option::PostfixText { std::to_string(num_batches) + "/" + std::to_string(num_batches) });
-    batch_bar.mark_as_completed();
 
     std::cout << std::endl;
     std::cout << "Loading testing set..." << std::flush;
@@ -243,13 +264,13 @@ int main() {
 
     // Test the trained model
     double score = 0.0;
+    #pragma omp parallel for
     for (size_t id = 0; id < testing.num_images(); ++id) {
-        testing_bar.set_option(option::PostfixText { std::to_string(id) + "/" + std::to_string(testing.num_images()) });
-        auto datum = dataset.sample(id);
+        auto datum = testing.sample(id);
         auto y_pred = network.forward(datum.first);
 
         int guess = 0;
-        double guess_confidence = 0;
+        double guess_confidence = -10000;
         for (size_t i = 0; i < 10; ++i) {
             if (y_pred->value(i) > guess_confidence) {
                 guess = i;
@@ -257,11 +278,12 @@ int main() {
             }
         }
 
-        if (guess == datum.second) { score += 1.0; }
-        testing_bar.tick();
+        #pragma omp critical 
+        {
+            if (guess == datum.second) { score += 1.0; }
+            testing_bar.tick();
+        }
     }
-    testing_bar.set_option(option::PostfixText { std::to_string(testing.num_images()) + "/" + std::to_string(testing.num_images()) });
-    testing_bar.mark_as_completed();
 
     std::cout << std::endl;
     std::cout << "Accuracy: " << (score / double(testing.num_images())) * 100.0 << "%" << std::endl;

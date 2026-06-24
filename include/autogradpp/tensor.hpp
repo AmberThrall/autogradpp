@@ -24,7 +24,7 @@ namespace autogradpp {
         /// Returns a scalar tensor
         static Tensor scalar(double val) { 
             Tensor t;
-            t.data()[0] = val;
+            t[0] = val;
             return t;
         }
 
@@ -35,7 +35,7 @@ namespace autogradpp {
         static Tensor vector(std::vector<double> entries) {
             Tensor t({entries.size()});
             for (size_t i = 0; i < entries.size(); ++i) {
-                t(i) = entries[i];
+                t[i] = entries[i];
             }
             return t;
         }
@@ -44,7 +44,7 @@ namespace autogradpp {
         static Tensor ones(Index shape) {
             Tensor t(shape);
             for (size_t k = 0; k < t.size(); ++k) {
-                t.data()[k] = 1;
+                t[k] = 1;
             }
             return t;
         }
@@ -59,14 +59,14 @@ namespace autogradpp {
         }
 
         /// Returns a tensor filled with uniform random values on [low,high) 
-        static Tensor rand(int low, int high, Index shape) {
+        static Tensor rand(Index shape, double low = 0.0, double high = 1.0) {
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_real_distribution<double> distrib(low, high);
 
             Tensor t(shape);
             for (size_t k = 0; k < t.size(); ++k) {
-                t.data()[k] = distrib(gen);
+                t[k] = distrib(gen);
             }
             return t;
         }
@@ -79,20 +79,20 @@ namespace autogradpp {
 
             Tensor t(shape);
             for (size_t k = 0; k < t.size(); ++k) {
-                t.data()[k] = distrib(gen);
+                t[k] = distrib(gen);
             }
             return t;
         }
 
         /// Returns a tensor filled with random values from the standard normal distribution
-        static Tensor randn(Index shape) {
+        static Tensor randn(Index shape, double mean = 0.0, double stddev = 1.0) {
             std::random_device rd;
             std::mt19937 gen(rd());
-            std::normal_distribution<double> distrib(0, 1);
+            std::normal_distribution<double> distrib(mean, stddev);
 
             Tensor t(shape);
             for (size_t k = 0; k < t.size(); ++k) {
-                t.data()[k] = distrib(gen);
+                t[k] = distrib(gen);
             }
             return t;
         }
@@ -106,6 +106,10 @@ namespace autogradpp {
         const double& operator()(Idx... idx) const {
             return _data[offset({static_cast<size_t>(idx)...})];
         }
+
+        double& operator[](size_t idx) { return _data[idx]; }
+
+        const double& operator[](size_t idx) const { return _data[idx]; }
 
         double& operator()(Index idx) {
             return _data[offset(idx)];
@@ -135,7 +139,8 @@ namespace autogradpp {
             Tensor copy({_shape[1], _shape[0]});
             for (size_t r = 0; r < _shape[1]; ++r) {
                 for (size_t c = 0; c < _shape[0]; ++c) {
-                    copy(r, c) = (*this)(c, r);
+                    double v = _data[c * _strides[0] + r * _strides[1]];
+                    copy.data()[r * copy.strides()[0] + c * copy.strides()[1]] = v;
                 }
             }
 
@@ -180,7 +185,7 @@ namespace autogradpp {
                 throw std::invalid_argument("cannot add tensors of different shape."); 
             }
             for (size_t k = 0; k < size(); ++k) {
-                _data[k] += rhs.data()[k];
+                _data[k] += rhs[k];
             }
             return *this;
         }
@@ -190,7 +195,7 @@ namespace autogradpp {
                 throw std::invalid_argument("cannot subtract tensors of different shape."); 
             }
             for (size_t k = 0; k < size(); ++k) {
-                _data[k] -= rhs.data()[k];
+                _data[k] -= rhs[k];
             }
             return *this;
         }
@@ -201,10 +206,10 @@ namespace autogradpp {
             }
             for (size_t k = 0; k < size(); ++k) {
                 if (rhs.shape().size() == 0) {
-                    _data[k] *= rhs.data()[0];
+                    _data[k] *= rhs[0];
                 }
                 else {
-                    _data[k] *= rhs.data()[k];
+                    _data[k] *= rhs[k];
                 }
             }
             return *this;
@@ -216,10 +221,10 @@ namespace autogradpp {
             }
             for (size_t k = 0; k < size(); ++k) {
                 if (rhs.shape().size() == 1) {
-                    _data[k] /= rhs.data()[0];
+                    _data[k] /= rhs[0];
                 }
                 else {
-                    _data[k] /= rhs.data()[k];
+                    _data[k] /= rhs[k];
                 }
             }
             return *this;
@@ -321,7 +326,6 @@ namespace autogradpp {
         }
 
         if (ashape[1] != bshape[0]) {
-            std::cout << "A: " << ashape[0] << "x" << ashape[1] << "; B: " << bshape[0] << "x" << bshape[1] << std::endl;
             throw std::invalid_argument("matmul2d: inner dimensions don't match.");
         }
 
@@ -330,7 +334,10 @@ namespace autogradpp {
             for (size_t j = 0; j < bshape[1]; ++j) {
                 double sum = 0.0;
                 for (size_t k = 0; k < ashape[1]; ++k) {
-                    sum += lhs(i, k) * rhs(k, j);
+                    double a = lhs.data()[i * lhs.strides()[0] + k * lhs.strides()[1]];
+                    double b = rhs.data()[k * rhs.strides()[0] + j * rhs.strides()[1]];
+                    sum += a * b;
+                    //sum += lhs(i, k) * rhs(k, j);
                 }
 
                 out(i, j) = sum;
