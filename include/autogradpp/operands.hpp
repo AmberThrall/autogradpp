@@ -340,7 +340,7 @@ namespace autogradpp {
     class Linear : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) { return inputs[0]; }
-        std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) { return { grad }; }
+        std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) { return { grad.reshape(inputs[0].shape()) }; }
     };
 
     inline Variable linear(Variable& a) {
