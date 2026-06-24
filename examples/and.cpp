@@ -1,19 +1,9 @@
-#include "autogradpp/mlp.hpp"
 #include <autogradpp/autogradpp.hpp>
-#include <memory>
 
 using namespace autogradpp;
 
 #include <iomanip>
 #include <iostream>
-
-std::shared_ptr<Node> mse(std::shared_ptr<Node> y_pred, std::shared_ptr<Node> y_true) {
-    auto diff = sub(y_pred, y_true);
-    auto diff_sq = mul(diff, diff);
-    auto loss = matmul(diff_sq, constant(Tensor::ones(diff_sq->value.shape())));
-    auto n = constant(Tensor::scalar(diff_sq->value.size()));
-    return div(loss, n);
-}
 
 int main() {
     std::cout << "autogradpp version: " << autogradpp::version() << std::endl;
@@ -39,16 +29,16 @@ int main() {
         double total_loss = 0.0;
         for (auto& [x_val, y_val] : dataset) {
             auto y_pred = neuron.forward(x_val);
-            auto y_true = constant(y_val);
-            auto loss = mse(y_pred, y_true);
+            auto y_true = Constant(y_val);
+            auto loss = (y_pred - y_true) * (y_pred - y_true);
 
-            total_loss += loss->value;
-            loss->backward();
+            total_loss += loss.value();
+            loss.backward();
 
             // Gradient descent
             for (auto param : neuron.parameters()) {
-                param->value -= learning_rate * param->grad;
-                param->grad = Tensor::zeros(param->grad.shape());
+                param.value() -= learning_rate * param.grad();
+                param.grad() = Tensor::zeros(param.grad().shape());
             }
         }
 
@@ -60,17 +50,15 @@ int main() {
     // Test the trained model
     std::cout << std::endl << "After Training:" << std::endl;
     double mse = 0;
-    for (auto& [x_val, y_val] : dataset) {
+    for (auto& [x_val, y_true] : dataset) {
         auto y_pred = neuron.forward(x_val);
-        auto y_true = constant(y_val);
 
-        std::cout << "  x=" << x_val  << " -> pred=" << y_pred->value << " (target=" << y_true->value << ")" << std::endl;
+        std::cout << "  x=" << x_val  << " -> pred=" << y_pred.value() << " (target=" << y_true << ")" << std::endl;
 
-        double err = y_pred->value - y_true->value;
+        double err = y_pred.value() - y_true;
         mse += err * err;
     }
     std::cout << std::endl << "Mean-squared Error: " << mse << std::endl;
-
 
     return 0;
 }

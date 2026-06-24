@@ -10,7 +10,7 @@
 namespace autogradpp {
     enum class Init { He, Xavier, Uniform };
     struct ActivationFn {
-        std::function<std::shared_ptr<Node>(std::shared_ptr<Node>)> fn;
+        std::function<Variable(Variable&)> fn;
         Init init;
     };
 
@@ -24,32 +24,33 @@ namespace autogradpp {
 
     class NeuronLayer {
     public:
-        std::shared_ptr<Node> weight;
-        std::shared_ptr<Node> bias;
+        Variable weight;
+        Variable bias;
         ActivationFn activation_fn;
 
         NeuronLayer(size_t num_inputs, size_t num_outputs, ActivationFn fn = activations::relu)
-            : bias(var(Tensor::zeros({num_outputs}))),
+            : weight(Variable(0)),
+              bias(Variable(Tensor::zeros({num_outputs}))),
               activation_fn(fn) {
             switch (fn.init) {
                 case Init::He:
-                    weight = var(Tensor::randn({num_outputs, num_inputs}, 0.0, std::sqrt(2.0 / num_inputs)));
+                    weight = Variable(Tensor::randn({num_outputs, num_inputs}, 0.0, std::sqrt(2.0 / num_inputs)));
                     break;
                 case Init::Xavier:
-                    weight = var(Tensor::randn({num_outputs, num_inputs}, 0.0, std::sqrt(1.0 / num_inputs)));
+                    weight = Variable(Tensor::randn({num_outputs, num_inputs}, 0.0, std::sqrt(1.0 / num_inputs)));
                     break;
                 case Init::Uniform:
-                    weight = var(Tensor::rand({num_outputs, num_inputs}, -1.0, 1.0));
+                    weight = Variable(Tensor::rand({num_outputs, num_inputs}, -1.0, 1.0));
                     break;
             }
         }
 
-        std::shared_ptr<Node> forward(const Tensor& x) {
-            return forward(input(x));
+        Variable forward(const Tensor& x) {
+            return forward(Variable(x));
         }
 
-        std::shared_ptr<Node> forward(std::shared_ptr<Node> x) {
-            auto pre_activation = add(matmul(weight, x), bias);
+        Variable forward(Variable x) {
+            auto pre_activation = matmul(weight, x) + bias;
             return activation_fn.fn(pre_activation);
         }
     };
@@ -82,25 +83,25 @@ namespace autogradpp {
             }
         }
 
-        std::shared_ptr<Node> forward(Tensor x) {
-            return forward(var(x));
+        Variable forward(Tensor x) {
+            return forward(Variable(x));
         }
 
-        std::shared_ptr<Node> forward(std::shared_ptr<Node> x) {
-            std::shared_ptr<Node> current = x;
+        Variable forward(Variable x) {
+            Variable current = x;
             for (auto& n : _layers) {
                 current = n->forward(current);
             }
 
-            if (current->value.size() == 1) { 
-                current->value = current->value.reshape({}); 
-                current->grad = current->grad.reshape({}); 
+            if (current.value().size() == 1) { 
+                current.value() = current.value().reshape({}); 
+                current.grad() = current.grad().reshape({}); 
             }
             return current;
         }       
 
-        std::vector<std::shared_ptr<Node>> parameters() {
-            std::vector<std::shared_ptr<Node>> ps;
+        std::vector<Variable> parameters() {
+            std::vector<Variable> ps;
             for (auto& layer : _layers) {
                 ps.push_back(layer->weight);
                 ps.push_back(layer->bias);

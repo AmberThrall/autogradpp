@@ -32,37 +32,37 @@ int main() {
     // Perform batch gradient descent `num_epochs` times
     for (size_t epoch = 0; epoch < num_epochs; ++epoch) {
         // Construct the graph
-        auto total_loss = input(0.0);
+        auto total_loss = Variable(0.0);
         for (auto& [x_val, y_val] : dataset) {
             auto y_pred = network.forward(x_val);
-            auto y_true = constant(y_val);
-            auto loss = sub(y_true, y_pred);
+            auto y_true = Constant(y_val);
+            auto loss = y_true - y_pred;
 
-            total_loss = add(total_loss, mul(loss, loss));
+            total_loss += loss * loss;
         }
+        total_loss /= 4;
             
         // Gradient descent
-        total_loss->backward();
+        total_loss.backward();
         for (auto param : network.parameters()) {
-            param->value -= learning_rate * param->grad;
-            param->grad = Tensor::zeros(param->grad.shape());
+            param.value() -= learning_rate * param.grad();
+            param.grad() = Tensor::zeros(param.grad().shape());
         }
 
         if ((epoch+1) % 1000 == 0 || epoch == 0) {
-            std::cout << "  epoch " << std::setw(5) << epoch + 1 << " loss=" << total_loss->value / 4.0 << std::endl;
+            std::cout << "  epoch " << std::setw(5) << epoch + 1 << " loss=" << total_loss.value() << std::endl;
         }
     }
 
     // Test the trained model
     std::cout << std::endl << "After Training:" << std::endl;
     double mse = 0;
-    for (auto& [x_val, y_val] : dataset) {
+    for (auto& [x_val, y_true] : dataset) {
         auto y_pred = network.forward(x_val);
-        auto y_true = constant(y_val);
 
-        std::cout << "  x=" << x_val  << " -> pred=" << y_pred->value << " (target=" << y_true->value << ")" << std::endl;
+        std::cout << "  x=" << x_val  << " -> pred=" << y_pred.value() << " (target=" << y_true << ")" << std::endl;
 
-        double err = y_pred->value - y_true->value;
+        double err = y_pred.value() - y_true;
         mse += err * err;
     }
     std::cout << std::endl << "Mean-squared Error: " << mse / 4 << std::endl;

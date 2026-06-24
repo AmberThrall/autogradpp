@@ -116,9 +116,10 @@ public:
     }        
 };
 
-std::shared_ptr<Node> cross_entropy(std::shared_ptr<Node> y_hat, std::shared_ptr<Node> y_true) {
+Variable cross_entropy(Variable y_hat, Variable y_true) {
     auto op = std::make_unique<CrossEntropyLoss>();
-    return std::make_shared<Node>(Node(std::move(op), {y_hat, y_true}));
+    auto new_node = std::make_shared<Node>(Node(std::move(op), {y_hat.node(), y_true.node()}));
+    return Variable(new_node);
 }
 
 
@@ -197,7 +198,7 @@ int main() {
 
             // Construct the graph
             double actual_batch_size = 0;
-            auto total_loss = input(0.0);
+            auto total_loss = Variable(0.0);
             for (size_t i = 0; i < batch_size; ++i) {
                 actual_batch_size += 1;
                 size_t id = batch * batch_size + i;
@@ -209,25 +210,20 @@ int main() {
 
                 Tensor label_onehot = Tensor::zeros({10});
                 label_onehot[datum.second] = 1;
-                auto y_true = constant(label_onehot);
+                auto y_true = Constant(label_onehot);
 
                 auto loss = cross_entropy(y_pred, y_true);
-                total_loss = add(total_loss, loss);
+                total_loss += loss;
             }
-            total_loss = div(total_loss, constant(Tensor::scalar(actual_batch_size)));
+            total_loss /= actual_batch_size;
                 
             // Gradient descent
-            total_loss->backward();
+            total_loss.backward();
             for (auto param : network.parameters()) {
-                double norm = 0.0;
-                for (size_t i = 0; i < param->grad.size(); ++i) { 
-                    norm += param->grad[i] * param->grad[i];
-                }
-
-                param->value -= learning_rate * param->grad;
-                param->grad = Tensor::zeros(param->grad.shape());
+                param.value() -= learning_rate * param.grad();
+                param.grad() = Tensor::zeros(param.grad().shape());
             }
-            batch_bar.set_option(option::PostfixText { " loss=" + std::to_string(total_loss->value) + " " });
+            batch_bar.set_option(option::PostfixText { " loss=" + std::to_string(total_loss.value()) + " " });
 
             bars[1].tick();
         }
@@ -272,9 +268,9 @@ int main() {
         int guess = 0;
         double guess_confidence = -10000;
         for (size_t i = 0; i < 10; ++i) {
-            if (y_pred->value(i) > guess_confidence) {
+            if (y_pred.value()[i] > guess_confidence) {
                 guess = i;
-                guess_confidence = y_pred->value(i);
+                guess_confidence = y_pred.value()[i];
             }
         }
 

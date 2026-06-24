@@ -6,6 +6,7 @@
 #include <memory>
 
 namespace autogradpp {
+    /// Base operand for input values
     class InputOp : public Operand {
     public:
         InputOp(Tensor val) : _val(val) {}
@@ -21,56 +22,7 @@ namespace autogradpp {
         Tensor _val;
     };
 
-    inline std::shared_ptr<Node> input(Tensor val) {
-        auto op = std::make_unique<InputOp>(val);
-        return std::make_shared<Node>(Node(std::move(op), {}, false));
-    }
-    inline std::shared_ptr<Node> input(double val) { return input(Tensor::scalar(val)); }
-
-    inline std::shared_ptr<Node> var(Tensor val) {
-        auto op = std::make_unique<InputOp>(val);
-        return std::make_shared<Node>(Node(std::move(op), {}));
-    }
-    inline std::shared_ptr<Node> var(double val) { return var(Tensor::scalar(val)); }
-
-    inline std::shared_ptr<Node> constant(Tensor val) {
-        auto op = std::make_unique<InputOp>(val);
-        return std::make_shared<Node>(Node(std::move(op), {}, false));
-    }
-    inline std::shared_ptr<Node> constant(double val) { return constant(Tensor::scalar(val)); }
-
-    class Mul : public Operand {
-    public:
-        Tensor forward(std::vector<Tensor>& inputs) {
-            return inputs[0] * inputs[1];
-        }
-
-        std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) {
-            return {grad * inputs[1], grad * inputs[0]};    
-        }
-    };
-
-    inline std::shared_ptr<Node> mul(std::shared_ptr<Node> a, std::shared_ptr<Node> b) {
-        auto op = std::make_unique<Mul>();
-        return std::make_shared<Node>(Node(std::move(op), {a, b}));
-    }
-
-    class Div : public Operand {
-    public:
-        Tensor forward(std::vector<Tensor>& inputs) {
-            return inputs[0] / inputs[1];
-        }
-
-        std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) {
-            return {grad / inputs[1], -1.0 * grad * inputs[0] / (inputs[1] * inputs[1])};    
-        }
-    };
-
-    inline std::shared_ptr<Node> div(std::shared_ptr<Node> a, std::shared_ptr<Node> b) {
-        auto op = std::make_unique<Div>();
-        return std::make_shared<Node>(Node(std::move(op), {a, b}));
-    }
-
+    /// Operand for x + y
     class Add : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
@@ -82,28 +34,123 @@ namespace autogradpp {
         }
     };
 
-    inline std::shared_ptr<Node> add(std::shared_ptr<Node> a, std::shared_ptr<Node> b) {
-        auto op = std::make_unique<Add>();
-        return std::make_shared<Node>(Node(std::move(op), {a, b}));
-    }
-
+    /// Operand for x - y 
     class Sub : public Operand {
+        public:
+            Tensor forward(std::vector<Tensor>& inputs) {
+                return inputs[0] - inputs[1];
+            }
+
+            std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) {
+                return {grad, grad * -1.0};    
+
+            }
+    };
+
+    /// Operand for x * y
+    class Mul : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
-            return inputs[0] - inputs[1];
+            return inputs[0] * inputs[1];
         }
 
         std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) {
-            return {grad, grad * -1.0};    
-
+            return {grad * inputs[1], grad * inputs[0]};    
         }
     };
 
-    inline std::shared_ptr<Node> sub(std::shared_ptr<Node> a, std::shared_ptr<Node> b) {
-        auto op = std::make_unique<Sub>();
-        return std::make_shared<Node>(Node(std::move(op), {a, b}));
-    }
+    /// Operand for x / y
+    class Div : public Operand {
+    public:
+        Tensor forward(std::vector<Tensor>& inputs) {
+            return inputs[0] / inputs[1];
+        }
 
+        std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) {
+            return {grad / inputs[1], -1.0 * grad * inputs[0] / (inputs[1] * inputs[1])};    
+        }
+    };
+
+    /// Thin wrapper for creating computational graphs
+    class Variable {
+    public:
+        Variable(double val, bool requires_grad = true) : Variable(Tensor::scalar(val), requires_grad) {}
+        Variable(Tensor val, bool requires_grad = true) {
+            auto op = std::make_unique<InputOp>(val);
+            _node = std::make_shared<Node>(Node(std::move(op), {}, requires_grad));
+        }
+        Variable(std::shared_ptr<Node> node) : _node(node) {}
+
+        Index shape() const { return _node->value.shape(); }
+        std::shared_ptr<Node> node() { return _node; }
+        Tensor& value() { return _node->value; }
+        const Tensor& value() const { return _node->value; }
+        Tensor& grad() { return _node->grad; }
+        const Tensor& grad() const { return _node->grad; }
+
+        void backward() { _node->backward(); }
+
+        // Operator overloads
+        Variable& operator+=(const Variable& rhs) {
+            if (shape() != rhs.shape()) {
+                throw std::invalid_argument("cannot add tensors of different shape."); 
+            }
+
+            auto op = std::make_unique<Add>();
+            auto new_node = std::make_shared<Node>(Node(std::move(op), {_node, rhs._node}));
+            _node = new_node;
+            return *this;
+        }
+
+        Variable& operator-=(const Variable& rhs) {
+            if (shape() != rhs.shape()) {
+                throw std::invalid_argument("cannot subtract tensors of different shape."); 
+            }
+
+            auto op = std::make_unique<Sub>();
+            auto new_node = std::make_shared<Node>(Node(std::move(op), {_node, rhs._node}));
+            _node = new_node;
+            return *this;
+        }
+
+        Variable& operator*=(const Variable& rhs) {
+            if (shape() != rhs.shape()) {
+                throw std::invalid_argument("cannot multiply tensors of different shape."); 
+            }
+
+            auto op = std::make_unique<Mul>();
+            auto new_node = std::make_shared<Node>(Node(std::move(op), {_node, rhs._node}));
+            _node = new_node;
+            return *this;
+        }
+
+        Variable& operator/=(const Variable& rhs) {
+            if (shape() != rhs.shape()) {
+                throw std::invalid_argument("cannot divide tensors of different shape."); 
+            }
+
+            auto op = std::make_unique<Div>();
+            auto new_node = std::make_shared<Node>(Node(std::move(op), {_node, rhs._node}));
+            _node = new_node;
+            return *this;
+        }
+    private:
+        std::shared_ptr<Node> _node;
+    };
+
+    inline Variable operator+(const Variable& a, const Variable& b) { Variable copy = a; copy += b; return copy; }
+    inline Variable operator-(const Variable& a, const Variable& b) { Variable copy = a; copy -= b; return copy; }
+    inline Variable operator*(const Variable& a, const Variable& b) { Variable copy = a; copy *= b; return copy; }
+    inline Variable operator/(const Variable& a, const Variable& b) { Variable copy = a; copy /= b; return copy; }
+
+    /// Special case of variable for constants
+    class Constant : public Variable {
+    public:
+        Constant(double val) : Constant(Tensor::scalar(val)) {}
+        Constant(Tensor val) : Variable(val, false) {}
+    };
+    
+    /// Operand for matrix multiplication
     class MatMul : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
@@ -134,11 +181,27 @@ namespace autogradpp {
         }
     };
 
-    inline std::shared_ptr<Node> matmul(std::shared_ptr<Node> a, std::shared_ptr<Node> b) {
+    inline Variable matmul(Variable a, Variable b) {
+        Index ashape = a.shape();
+        Index bshape = b.shape();
+        if (ashape.size() > 2 || bshape.size() > 2) {
+            throw std::invalid_argument("matmul: higher dimensional matrix multiplication is currently not supported.");
+        }
+        if (ashape.size() == 2 || bshape.size() == 2) {
+            if (ashape.size() == 2 && ashape[1] != bshape[0]) {
+                throw std::invalid_argument("matmul: inner dimensions don't match.");
+            }
+            if (ashape.size() == 1 && ashape[0] != bshape[0]) {
+                throw std::invalid_argument("matmul: inner dimensions don't match.");
+            }
+        }
+
         auto op = std::make_unique<MatMul>();
-        return std::make_shared<Node>(Node(std::move(op), {a, b}));
+        auto new_node = std::make_shared<Node>(Node(std::move(op), {a.node(), b.node()}));
+        return Variable(new_node);
     }
 
+    /// Operand for sigmoid activation function
     class Sigmoid : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
@@ -155,11 +218,13 @@ namespace autogradpp {
         }
     };
 
-    inline std::shared_ptr<Node> sigmoid(std::shared_ptr<Node> a) {
+    inline Variable sigmoid(Variable a) {
         auto op = std::make_unique<Sigmoid>();
-        return std::make_shared<Node>(Node(std::move(op), {a}));
+        auto new_node = std::make_shared<Node>(Node(std::move(op), {a.node()}));
+        return Variable(new_node);  
     }
 
+    /// Operand for ReLU activation function
     class ReLU : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
@@ -179,11 +244,13 @@ namespace autogradpp {
         }
     };
 
-    inline std::shared_ptr<Node> relu(std::shared_ptr<Node> a) {
+    inline Variable relu(Variable a) {
         auto op = std::make_unique<ReLU>();
-        return std::make_shared<Node>(Node(std::move(op), {a}));
+        auto new_node = std::make_shared<Node>(Node(std::move(op), {a.node()}));
+        return Variable(new_node);  
     }
-
+    
+    /// Operand for hyperbolic tangent activation function
     class Tanh : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
@@ -201,11 +268,13 @@ namespace autogradpp {
         }
     };
 
-    inline std::shared_ptr<Node> tanh(std::shared_ptr<Node> a) {
+    inline Variable tanh(Variable a) {
         auto op = std::make_unique<Tanh>();
-        return std::make_shared<Node>(Node(std::move(op), {a}));
+        auto new_node = std::make_shared<Node>(Node(std::move(op), {a.node()}));
+        return Variable(new_node);  
     }
-
+   
+    /// Operand for hard hyperbolic tangent activation function
     class HardTanh : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
@@ -225,11 +294,13 @@ namespace autogradpp {
         }
     };
 
-    inline std::shared_ptr<Node> hard_tanh(std::shared_ptr<Node> a) {
-        auto op = std::make_unique<HardTanh>();
-        return std::make_shared<Node>(Node(std::move(op), {a}));
+    inline Variable hard_tanh(Variable a) {
+        auto op = std::make_unique<Tanh>();
+        auto new_node = std::make_shared<Node>(Node(std::move(op), {a.node()}));
+        return Variable(new_node);  
     }
-
+  
+    /// Operand for softmax function
     class Softmax : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) {
@@ -259,19 +330,22 @@ namespace autogradpp {
         }
     };
 
-    inline std::shared_ptr<Node> softmax(std::shared_ptr<Node> a) {
+    inline Variable softmax(Variable a) {
         auto op = std::make_unique<Softmax>();
-        return std::make_shared<Node>(Node(std::move(op), {a}));
+        auto new_node = std::make_shared<Node>(Node(std::move(op), {a.node()}));
+        return Variable(new_node);  
     }
-
+ 
+    /// Operand for identity function
     class Linear : public Operand {
     public:
         Tensor forward(std::vector<Tensor>& inputs) { return inputs[0]; }
         std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) { return { grad }; }
     };
 
-    inline std::shared_ptr<Node> linear(std::shared_ptr<Node> a) {
+    inline Variable linear(Variable& a) {
         auto op = std::make_unique<Linear>();
-        return std::make_shared<Node>(Node(std::move(op), {a}));
+        auto new_node = std::make_shared<Node>(Node(std::move(op), {a.node()}));
+        return Variable(new_node);  
     }
 }

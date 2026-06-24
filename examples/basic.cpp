@@ -24,23 +24,23 @@ int main() {
 
     while (true) {
         // Compute z = (x-2)^2 + (y-5)^2
-        auto x = input(x_start);
-        auto c = constant(soln);
+        auto x = Variable(x_start);
+        auto c = Constant(soln);
 
-        auto diff = sub(x, c);
-        auto z = matmul(mul(diff, diff), constant(Tensor::ones({2})));
+        auto diff = x - c;
+        auto z = matmul((diff * diff), Constant(Tensor::ones({2})));
 
-        if (std::abs(last_z - z->value) < stopping_criteria && step > 0) { break; }
+        if (std::abs(last_z - z.value()) < stopping_criteria && step > 0) { break; }
 
         // Differentiate and perform gradient descent
-        z->backward();
+        z.backward();
 
         if ((step+1) % 5 == 0 || step == 0) {
-            printf("%3d: x=%.3f, y=%.3f, z=%.4f, ∂z/∂x=%.3f, ∂z/∂y=%.3f\n", step+1, x->value(0), x->value(1), (double)z->value, x->grad(0), x->grad(1));
+            printf("%3d: x=%.3f, y=%.3f, z=%.4f, ∂z/∂x=%.3f, ∂z/∂y=%.3f\n", step+1, x.value()(0), x.value()(1), (double)z.value(), x.grad()(0), x.grad()(1));
         }
 
-        x_start -= learning_rate * x->grad;
-        last_z = z->value;
+        x_start -= learning_rate * x.grad();
+        last_z = z.value();
         step += 1;
     }
 
