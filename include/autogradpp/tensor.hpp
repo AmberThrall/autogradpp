@@ -216,11 +216,11 @@ namespace autogradpp {
         }
 
         Tensor& operator/=(const Tensor& rhs) {
-            if (shape() != rhs.shape() && rhs.shape().size() != 1) {
+            if (shape() != rhs.shape() && rhs.shape().size() != 0) {
                 throw std::invalid_argument("cannot divide tensors of different shape."); 
             }
             for (size_t k = 0; k < size(); ++k) {
-                if (rhs.shape().size() == 1) {
+                if (rhs.shape().size() == 0) {
                     _data[k] /= rhs[0];
                 }
                 else {

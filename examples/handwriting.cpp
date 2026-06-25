@@ -98,31 +98,6 @@ private:
     }
 };
 
-class CrossEntropyLoss : public Operand {
-public:
-    Tensor forward(std::vector<Tensor>& inputs) {
-        auto& y_hat = inputs[0];
-        auto& y = inputs[1];
-        double loss = 0.0;
-        for (size_t i = 0; i < y.size(); ++i) {
-            double p = std::max(y_hat(i), 1e-7);
-            loss -= y(i) * std::log(p);
-        }
-        return Tensor::scalar(loss);
-    }
-
-    std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) {
-        return { (inputs[0] - inputs[1]) * grad, Tensor::zeros(inputs[1].shape()) };
-    }        
-};
-
-Variable cross_entropy(Variable y_hat, Variable y_true) {
-    auto op = std::make_unique<CrossEntropyLoss>();
-    auto new_node = std::make_shared<Node>(Node(std::move(op), {y_hat.node(), y_true.node()}));
-    return Variable(new_node);
-}
-
-
 int main() {
     std::cout << "autogradpp version: " << autogradpp::version() << std::endl;
 
@@ -232,9 +207,7 @@ int main() {
         std::shuffle(image_order.begin(), image_order.end(), rng);
         bars[0].tick();
     }
-
-    epoch_bar.set_option(option::PostfixText { std::to_string(num_epochs) + "/" + std::to_string(num_epochs) });
-    epoch_bar.mark_as_completed();
+    bars[0].mark_as_completed();
 
     std::cout << std::endl;
     std::cout << "Loading testing set..." << std::flush;

@@ -2,14 +2,17 @@
 
 #include "tensor.hpp"
 #include <memory>
+#include <stdexcept>
 #include <unordered_set>
 #include <algorithm>
+#include <sstream>
 
 namespace autogradpp {
     class Operand {
     public:
         virtual Tensor forward(std::vector<Tensor>& inputs) = 0;
         virtual std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) = 0;
+        virtual std::string name() const = 0;
     };
 
     struct Node {
@@ -43,7 +46,16 @@ namespace autogradpp {
                 auto sz = node->_op->backward(inputs, n_grad);
 
                 for (size_t i = 0; i < node->_parents.size(); ++i) {
-                    node->_parents[i]->grad += sz[i];
+                    if (!node->_parents[i]->_requires_grad) { continue; }
+                    try {
+                        node->_parents[i]->grad += sz[i];
+                    } catch (const std::invalid_argument& e) {
+                        std::stringstream msg;
+                        msg << "Error occured during backward for operand '";
+                        msg << node->_op->name();
+                        msg << "'! Cannot add " << node->_parents[i]->grad << " to " << sz[i] << ".";
+                        throw std::runtime_error(msg.str());
+                    }
                 }
             }
         }
