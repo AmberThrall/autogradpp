@@ -25,7 +25,7 @@ int main() {
 
     // Create a multilayer perceptron with one hidden layer. Use tanh as the activation function.
     NeuralNetwork network(2, {
-        {4, activations::relu}, 
+        {4, activations::tanh}, 
         {1, activations::linear}
     });
 
