@@ -12,3 +12,6 @@ find_package(OpenMP REQUIRED)
 add_executable(handwriting handwriting.cpp)
 target_link_libraries(handwriting PRIVATE autogradpp::autogradpp OpenMP::OpenMP_CXX)
 
+add_executable(cora cora.cpp)
+target_link_libraries(cora PRIVATE autogradpp::autogradpp OpenMP::OpenMP_CXX)
+
