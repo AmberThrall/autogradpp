@@ -10,6 +10,7 @@
 namespace autogradpp {
     class Operand {
     public:
+        virtual ~Operand() = default;
         virtual Tensor forward(std::vector<Tensor>& inputs) = 0;
         virtual std::vector<Tensor> backward(std::vector<Tensor>& inputs, const Tensor& grad) = 0;
         virtual std::string name() const = 0;
