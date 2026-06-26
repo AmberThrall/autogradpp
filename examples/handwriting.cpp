@@ -194,9 +194,9 @@ int main() {
                 
             // Gradient descent
             total_loss.backward();
-            for (auto param : network.parameters()) {
-                param.value() -= learning_rate * param.grad();
-                param.grad() = Tensor::zeros(param.grad().shape());
+            for (auto& param : network.parameters()) {
+                param->value() -= learning_rate * param->grad();
+                param->grad() = Tensor::zeros(param->grad().shape());
             }
             batch_bar.set_option(option::PostfixText { " loss=" + std::to_string(total_loss.value()) + " " });
 

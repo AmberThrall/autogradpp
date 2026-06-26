@@ -340,7 +340,8 @@ namespace autogradpp {
                     //sum += lhs(i, k) * rhs(k, j);
                 }
 
-                out(i, j) = sum;
+                out.data()[i * out.strides()[0] + j * out.strides()[1]] = sum;
+                //out(i, j) = sum;
             }
         }
 

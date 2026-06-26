@@ -100,11 +100,11 @@ namespace autogradpp {
             return current;
         }       
 
-        std::vector<Variable> parameters() {
-            std::vector<Variable> ps;
+        std::vector<Variable*> parameters() {
+            std::vector<Variable*> ps;
             for (auto& layer : _layers) {
-                ps.push_back(layer->weight);
-                ps.push_back(layer->bias);
+                ps.push_back(&layer->weight);
+                ps.push_back(&layer->bias);
             }
             return ps;
         }

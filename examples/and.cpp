@@ -36,9 +36,9 @@ int main() {
             loss.backward();
 
             // Gradient descent
-            for (auto param : neuron.parameters()) {
-                param.value() -= learning_rate * param.grad();
-                param.grad() = Tensor::zeros(param.grad().shape());
+            for (auto& param : neuron.parameters()) {
+                param->value() -= learning_rate * param->grad();
+                param->grad() = Tensor::zeros(param->grad().shape());
             }
         }
 

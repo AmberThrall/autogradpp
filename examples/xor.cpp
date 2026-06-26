@@ -44,9 +44,9 @@ int main() {
             
         // Gradient descent
         total_loss.backward();
-        for (auto param : network.parameters()) {
-            param.value() -= learning_rate * param.grad();
-            param.grad() = Tensor::zeros(param.grad().shape());
+        for (auto& param : network.parameters()) {
+            param->value() -= learning_rate * param->grad();
+            param->grad() = Tensor::zeros(param->grad().shape());
         }
 
         if ((epoch+1) % 1000 == 0 || epoch == 0) {
